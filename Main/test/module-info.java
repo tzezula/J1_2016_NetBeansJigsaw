@@ -39,10 +39,7 @@
  *
  * Portions Copyrighted 2008 Sun Microsystems, Inc.
  */
-module org.netbeans.lsmod {
+module org.netbeans.lsmod.test {
+    requires org.netbeans.lsmod;
     requires org.openide.filesystems;
-    requires org.openide.util;
-    requires org.netbeans.api.annotations.common;
-    exports org.netbeans.modules.lsmod.api;
-    uses org.openide.filesystems.URLMapper;    
 }

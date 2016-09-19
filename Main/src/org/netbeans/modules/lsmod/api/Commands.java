@@ -39,76 +39,82 @@
  *
  * Portions Copyrighted 2008 Sun Microsystems, Inc.
  */
-package main;
+package org.netbeans.modules.lsmod.api;
 
 import java.io.IOException;
-import java.net.MalformedURLException;
 import java.net.URL;
 import java.util.Arrays;
+import java.util.Enumeration;
+import java.util.Iterator;
+import java.util.Optional;
+import java.util.Spliterators;
 import java.util.stream.Stream;
+import java.util.stream.StreamSupport;
 import org.netbeans.api.annotations.common.NonNull;
-import org.netbeans.modules.lsmod.api.Commands;
 import org.openide.filesystems.FileObject;
-import org.openide.filesystems.FileStateInvalidException;
-import org.openide.filesystems.FileUtil;
 import org.openide.filesystems.URLMapper;
+import org.openide.util.NbCollections;
+import org.openide.util.Parameters;
 
 /**
  *
  * @author Tomas Zezula
  */
-public class Main {
+public final class Commands {
+    private Commands() {
+        throw new IllegalStateException("No instance allowed"); //NOI18N
+    }
     
-    /**
-     * @param args the command line arguments
-     */
-    public static void main(String[] args) {
-        if (args.length == 0 || (args.length == 1 && "-ls".equals(args[0]))) { //NOI18N
-            ls();
-        } else if (args.length >= 2 && "-cat".equals(args[0])) { //NOI18N
-            cat(Arrays.stream(args,1,args.length));
-        } else {
-            usage();
+    @NonNull
+    public static Stream<FileObject> listModules() throws IOException {
+        return getModules()
+                .map((fo) -> Arrays.stream(fo.getChildren()))
+                .orElse(Stream.empty());
+        
+    }
+    
+    @NonNull
+    public static Stream<? extends FileObject> listModule(@NonNull final String moduleName) throws IOException {
+        Parameters.notNull("moduleName", moduleName);   //NOI18N
+        return getModules()
+                .map((fo) -> {
+                    return Arrays.stream(fo.getChildren())
+                            .filter((mod) -> moduleName.equals(mod.getNameExt()))
+                            .flatMap((mod) -> StreamSupport.stream(
+                                Spliterators.spliteratorUnknownSize(EnumIt.of(mod.getChildren(true)),0),
+                                false)
+                                    .filter((f)-> f.isData()));
+                })
+                .orElse(Stream.empty());
+    }
+    
+    @NonNull
+    private static Optional<? extends FileObject> getModules() throws IOException {
+        return Optional.ofNullable(URLMapper.findFileObject(new URL("jrt:///")))    //NOI18N
+                .map((root) -> root.getFileObject("modules"));   //NOI18N        
+    }
+    
+    private static final class EnumIt<T> implements Iterator<T> {
+        private final Enumeration<? extends T> enumeration;
+        
+        private EnumIt(@NonNull final Enumeration<? extends T> enumeration) {
+            Parameters.notNull("enumeration", enumeration); //NOI18N
+            this.enumeration = enumeration;
+        }
+
+        @Override
+        public boolean hasNext() {
+            return enumeration.hasMoreElements();
+        }
+
+        @Override
+        public T next() {
+            return enumeration.nextElement();
+        }
+        
+        @NonNull
+        static <T> EnumIt<T> of (Enumeration<? extends T> enumeration) {
+            return new EnumIt(enumeration);
         }
     }
-    
-    private static void ls() {
-        try {
-            Commands.listModules()
-                    .map((fo) -> fo.getNameExt())
-                    .forEach(System.out::println);
-        } catch (IOException ioe) {
-            System.err.println("Cannot read modules image.");    //NOI18N
-            ioe.printStackTrace();
-        }
-    }
-    
-    private static void cat(@NonNull final Stream<? extends String> modules) {
-        modules.forEach((module) -> {
-            try {
-                Commands.listModule(module)
-                        .map((fo) -> {
-                            try {
-                                final FileObject moduleRoot = fo.getFileSystem().getRoot().getFileObject(
-                                        String.format("modules/%s", module));   //NOI18N
-                                return FileUtil.getRelativePath(moduleRoot, fo);
-                            } catch (FileStateInvalidException ioe) {
-                                return null;
-                            }
-                        })
-                        .filter((p) -> p != null)
-                        .forEach(System.out::println);
-            } catch (IOException ioe) {
-                System.err.println("Error reading module: " + module);
-            }
-            
-        });
-    }
-    
-    private static void usage() {
-        System.err.println("lsmod -ls\t\t\t\tlists modules");
-        System.err.println("lsmod -cat <module>+\t\t\tlists content of module(s)");
-        System.exit(1);
-    }
-    
 }

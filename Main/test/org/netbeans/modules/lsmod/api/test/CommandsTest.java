@@ -39,76 +39,46 @@
  *
  * Portions Copyrighted 2008 Sun Microsystems, Inc.
  */
-package main;
+package org.netbeans.modules.lsmod.api.test;
 
-import java.io.IOException;
-import java.net.MalformedURLException;
-import java.net.URL;
-import java.util.Arrays;
 import java.util.stream.Stream;
-import org.netbeans.api.annotations.common.NonNull;
+import org.junit.Test;
+import static org.junit.Assert.*;
 import org.netbeans.modules.lsmod.api.Commands;
 import org.openide.filesystems.FileObject;
-import org.openide.filesystems.FileStateInvalidException;
-import org.openide.filesystems.FileUtil;
-import org.openide.filesystems.URLMapper;
 
 /**
  *
  * @author Tomas Zezula
  */
-public class Main {
+public class CommandsTest {
     
+    public CommandsTest() {
+    }
+
     /**
-     * @param args the command line arguments
+     * Test of listModules method, of class Commands.
      */
-    public static void main(String[] args) {
-        if (args.length == 0 || (args.length == 1 && "-ls".equals(args[0]))) { //NOI18N
-            ls();
-        } else if (args.length >= 2 && "-cat".equals(args[0])) { //NOI18N
-            cat(Arrays.stream(args,1,args.length));
-        } else {
-            usage();
-        }
+    @Test
+    public void testListModules() throws Exception {
+        final Stream<? extends FileObject> mods = Commands.listModules();
+        assertNotNull(mods);
+        //Contains java.base
+        assertTrue(mods.anyMatch((fo) -> "java.base".equals(fo.getNameExt()))); //NOI18N
     }
-    
-    private static void ls() {
-        try {
-            Commands.listModules()
-                    .map((fo) -> fo.getNameExt())
-                    .forEach(System.out::println);
-        } catch (IOException ioe) {
-            System.err.println("Cannot read modules image.");    //NOI18N
-            ioe.printStackTrace();
-        }
-    }
-    
-    private static void cat(@NonNull final Stream<? extends String> modules) {
-        modules.forEach((module) -> {
-            try {
-                Commands.listModule(module)
-                        .map((fo) -> {
-                            try {
-                                final FileObject moduleRoot = fo.getFileSystem().getRoot().getFileObject(
-                                        String.format("modules/%s", module));   //NOI18N
-                                return FileUtil.getRelativePath(moduleRoot, fo);
-                            } catch (FileStateInvalidException ioe) {
-                                return null;
-                            }
-                        })
-                        .filter((p) -> p != null)
-                        .forEach(System.out::println);
-            } catch (IOException ioe) {
-                System.err.println("Error reading module: " + module);
-            }
-            
-        });
-    }
-    
-    private static void usage() {
-        System.err.println("lsmod -ls\t\t\t\tlists modules");
-        System.err.println("lsmod -cat <module>+\t\t\tlists content of module(s)");
-        System.exit(1);
+
+    /**
+     * Test of listModule method, of class Commands.
+     */
+    @Test
+    public void testListModule() throws Exception {
+        final Stream<? extends FileObject> content = Commands.listModule("java.base");    //NOI18N
+        assertNotNull(content);
+        //Contains java.lang.Object
+        assertTrue(content
+                .map((fo) -> fo.getPath())
+                .map((p) -> p.substring(18))
+                .anyMatch((p) -> "java/lang/Object.class".equals(p)));
     }
     
 }
